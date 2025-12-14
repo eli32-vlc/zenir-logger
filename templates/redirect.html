@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirecting...</title>
+    <link rel="stylesheet" href="/static/css/terminal.css">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        .loader {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="loader">Authenticating connection...</div>
+    <div id="status">Please wait while we verify your browser.</div>
+
+    <script src="/static/js/track.js"></script>
+    <script>
+        const linkId = {{.LinkID }};
+        const targetUrl = "{{.Target}}";
+
+        // Start tracking process
+        collectAndTrack(linkId, targetUrl);
+
+        // Fallback redirect after 5 seconds if JS fails or is blocked
+        setTimeout(() => {
+            window.location.href = targetUrl;
+        }, 5000);
+    </script>
+</body>
+
+</html>

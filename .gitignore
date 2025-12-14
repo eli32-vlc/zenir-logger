@@ -1,0 +1,25 @@
+# Binaries
+zenir
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Database
+zenir.db
+*.db
+*.sqlite
+
+# Logs
+*.log
+server.log
+
+# Environment
+.env
+
+# MacOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

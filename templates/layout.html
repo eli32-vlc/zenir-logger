@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zenir</title>
+    <link rel="stylesheet" href="/static/css/terminal.css">
+    <style>
+        body {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            margin-bottom: 40px;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 20px;
+        }
+
+        nav a {
+            margin-right: 20px;
+        }
+
+        .error {
+            color: #ff4444;
+            border: 1px solid #ff4444;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Zenir // Logger</h1>
+        {{if .Authenticated}}
+        <nav>
+            <a href="/admin">Dashboard</a>
+            <a href="/admin/logout">Logout</a>
+        </nav>
+        {{end}}
+    </header>
+    <main>
+        {{template "content" .}}
+    </main>
+</body>
+
+</html>

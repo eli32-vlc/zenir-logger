@@ -1,0 +1,41 @@
+{{define "content"}}
+<div class="stats">
+    <h2>Stats for /{{.Data.Slug}}</h2>
+    <a href="/admin">
+        << Back to Dashboard</a>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>IP</th>
+                        <th>Platform</th>
+                        <th>Screen</th>
+                        <th>Timezone</th>
+                        <th>Fingerprint</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Data.Visits}}
+                    <tr>
+                        <td>{{.Timestamp.Format "2006-01-02 15:04:05"}}</td>
+                        <td>{{.IP}}</td>
+                        <td>{{.Platform}}</td>
+                        <td>{{.ScreenWidth}}x{{.ScreenHeight}}</td>
+                        <td>{{.Timezone}}</td>
+                        <td style="word-break: break-all; font-size: 0.8em;"><a
+                                href="/admin/hash?hash={{.Fingerprint}}">{{.Fingerprint}}</a></td>
+                        <td>
+                            <details>
+                                <summary>View</summary>
+                                <pre
+                                    style="font-size: 0.7em; max-width: 300px; overflow-x: auto;">{{.FingerprintDetails}}</pre>
+                            </details>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+</div>
+{{end}}

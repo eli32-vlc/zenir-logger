@@ -1,0 +1,49 @@
+{{define "content"}}
+<div class="container">
+    <header>
+        <h1>Visits for Hash</h1>
+        <p class="terminal-alert terminal-alert-primary">{{.Data.Hash}}</p>
+        <nav>
+            <ul>
+                <li><a href="/admin">Dashboard</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>IP</th>
+                <th>User Agent</th>
+                <th>Referer</th>
+                <th>Screen</th>
+                <th>Language</th>
+                <th>Platform</th>
+                <th>Timezone</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Data.Visits}}
+            <tr>
+                <td>{{.Timestamp.Format "2006-01-02 15:04:05"}}</td>
+                <td>{{.IP}}</td>
+                <td>{{.UserAgent}}</td>
+                <td>{{.Referer}}</td>
+                <td>{{.ScreenWidth}}x{{.ScreenHeight}}</td>
+                <td>{{.Language}}</td>
+                <td>{{.Platform}}</td>
+                <td>{{.Timezone}}</td>
+                <td>
+                    <details>
+                        <summary>View</summary>
+                        <pre>{{.FingerprintDetails}}</pre>
+                    </details>
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}
