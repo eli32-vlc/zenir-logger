@@ -4,6 +4,9 @@
     <form action="/admin/login" method="POST">
         <fieldset>
             <legend>Login</legend>
+            {{if .Data}}
+            <input type="hidden" name="csrf_token" value="{{.Data.CSRFToken}}">
+            {{end}}
             <div class="form-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" required>
