@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"html/template"
-	"math/rand"
+	"math/big"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/easonli/zenir/db"
@@ -71,11 +74,33 @@ func CreateLinkHandler(w http.ResponseWriter, r *http.Request) {
 	target := r.FormValue("target")
 	slug := r.FormValue("slug")
 
-	if slug == "" {
+	// Validate target URL
+	parsedURL, err := url.Parse(target)
+	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
+		http.Error(w, "Invalid target URL. Must be a valid HTTP or HTTPS URL.", http.StatusBadRequest)
+		return
+	}
+
+	// Only allow http and https schemes to prevent javascript: or data: URIs
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		http.Error(w, "Invalid URL scheme. Only HTTP and HTTPS are allowed.", http.StatusBadRequest)
+		return
+	}
+
+	// Validate slug if provided
+	if slug != "" {
+		// Slug should only contain alphanumeric characters and hyphens
+		for _, c := range slug {
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
+				http.Error(w, "Invalid slug. Only alphanumeric characters, hyphens, and underscores are allowed.", http.StatusBadRequest)
+				return
+			}
+		}
+	} else {
 		slug = generateSlug(6)
 	}
 
-	_, err := db.DB.Exec("INSERT INTO links (slug, target) VALUES (?, ?)", slug, target)
+	_, err = db.DB.Exec("INSERT INTO links (slug, target) VALUES (?, ?)", slug, target)
 	if err != nil {
 		http.Error(w, "Slug already exists or database error", http.StatusInternalServerError)
 		return
@@ -197,7 +222,12 @@ const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 func generateSlug(length int) string {
 	b := make([]byte, length)
 	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			// Fallback to timestamp-based generation if crypto/rand fails
+			return strings.ReplaceAll(time.Now().Format("20060102150405.000000"), ".", "")[:length]
+		}
+		b[i] = charset[n.Int64()]
 	}
 	return string(b)
 }
