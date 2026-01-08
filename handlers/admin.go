@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"html/template"
-	"math/rand"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/easonli/zenir/db"
@@ -55,10 +57,16 @@ func AdminDashboardHandler(w http.ResponseWriter, r *http.Request) {
 		links = append(links, l)
 	}
 
+	// Generate CSRF token
+	csrfToken := GenerateCSRFToken()
+
 	tmpl := template.Must(template.ParseFiles("templates/layout.html", "templates/admin.html"))
 	tmpl.Execute(w, PageData{
 		Authenticated: true,
-		Data:          links,
+		Data: map[string]interface{}{
+			"Links":     links,
+			"CSRFToken": csrfToken,
+		},
 	})
 }
 
@@ -68,8 +76,22 @@ func CreateLinkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate CSRF token
+	csrfToken := r.FormValue("csrf_token")
+	if !ValidateCSRFToken(csrfToken) {
+		http.Error(w, "Invalid or expired CSRF token", http.StatusForbidden)
+		return
+	}
+	ConsumeCSRFToken(csrfToken)
+
 	target := r.FormValue("target")
 	slug := r.FormValue("slug")
+
+	// Validate target URL to prevent open redirect attacks
+	if !isValidURL(target) {
+		http.Error(w, "Invalid target URL. Only http:// and https:// URLs are allowed.", http.StatusBadRequest)
+		return
+	}
 
 	if slug == "" {
 		slug = generateSlug(6)
@@ -155,6 +177,14 @@ func DeleteLinkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate CSRF token
+	csrfToken := r.FormValue("csrf_token")
+	if !ValidateCSRFToken(csrfToken) {
+		http.Error(w, "Invalid or expired CSRF token", http.StatusForbidden)
+		return
+	}
+	ConsumeCSRFToken(csrfToken)
+
 	id := r.FormValue("id")
 	if id == "" {
 		http.Error(w, "Missing link ID", http.StatusBadRequest)
@@ -196,8 +226,36 @@ const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 func generateSlug(length int) string {
 	b := make([]byte, length)
+	// Use crypto/rand for secure random generation
+	_, err := rand.Read(b)
+	if err != nil {
+		// Fallback to timestamp-based generation if crypto/rand fails
+		return string(time.Now().UnixNano())
+	}
 	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
+		b[i] = charset[int(b[i])%len(charset)]
 	}
 	return string(b)
+}
+
+// isValidURL checks if a URL is safe to redirect to
+func isValidURL(targetURL string) bool {
+	if targetURL == "" {
+		return false
+	}
+	
+	// Parse the URL
+	parsed, err := url.Parse(targetURL)
+	if err != nil {
+		return false
+	}
+	
+	// Only allow http and https schemes
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return false
+	}
+	
+	// Disallow javascript:, data:, file:, etc.
+	return true
 }

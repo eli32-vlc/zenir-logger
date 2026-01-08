@@ -23,15 +23,15 @@ func main() {
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
 	// Auth routes
-	http.HandleFunc("/admin/login", handlers.LoginHandler)
-	http.HandleFunc("/admin/logout", handlers.LogoutHandler)
+	http.HandleFunc("/admin/login", handlers.SecurityHeadersMiddleware(handlers.LoginHandler))
+	http.HandleFunc("/admin/logout", handlers.SecurityHeadersMiddleware(handlers.LogoutHandler))
 
 	// Admin routes (protected)
-	http.HandleFunc("/admin", handlers.AuthMiddleware(handlers.AdminDashboardHandler))
-	http.HandleFunc("/admin/create", handlers.AuthMiddleware(handlers.CreateLinkHandler))
-	http.HandleFunc("/admin/stats", handlers.AuthMiddleware(handlers.LinkStatsHandler))
-	http.HandleFunc("/admin/hash", handlers.AuthMiddleware(handlers.HashStatsHandler))
-	http.HandleFunc("/admin/delete", handlers.AuthMiddleware(handlers.DeleteLinkHandler))
+	http.HandleFunc("/admin", handlers.SecurityHeadersMiddleware(handlers.AuthMiddleware(handlers.AdminDashboardHandler)))
+	http.HandleFunc("/admin/create", handlers.SecurityHeadersMiddleware(handlers.AuthMiddleware(handlers.CreateLinkHandler)))
+	http.HandleFunc("/admin/stats", handlers.SecurityHeadersMiddleware(handlers.AuthMiddleware(handlers.LinkStatsHandler)))
+	http.HandleFunc("/admin/hash", handlers.SecurityHeadersMiddleware(handlers.AuthMiddleware(handlers.HashStatsHandler)))
+	http.HandleFunc("/admin/delete", handlers.SecurityHeadersMiddleware(handlers.AuthMiddleware(handlers.DeleteLinkHandler)))
 
 	// Public routes
 	http.HandleFunc("/track", handlers.TrackHandler)
