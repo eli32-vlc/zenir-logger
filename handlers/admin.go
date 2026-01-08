@@ -251,7 +251,15 @@ func generateSlug(length int) string {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
 		if err != nil {
 			// Fallback to timestamp-based generation if crypto/rand fails
-			return strings.ReplaceAll(time.Now().Format("20060102150405.000000"), ".", "")[:length]
+			ts := strings.ReplaceAll(time.Now().Format("20060102150405.000000"), ".", "")
+			if len(ts) >= length {
+				return ts[:length]
+			}
+			// If timestamp is shorter, pad with random chars from charset
+			for len(ts) < length {
+				ts += string(charset[len(ts)%len(charset)])
+			}
+			return ts[:length]
 		}
 		b[i] = charset[n.Int64()]
 	}

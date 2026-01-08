@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -199,15 +200,10 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	ip := r.RemoteAddr
 	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
 		// Take the first IP in the X-Forwarded-For chain
-		ip = forwarded
-		if idx := len(ip); idx > 0 {
-			for i, c := range ip {
-				if c == ',' {
-					idx = i
-					break
-				}
-			}
-			ip = ip[:idx]
+		if commaIdx := strings.IndexAny(forwarded, ", "); commaIdx > 0 {
+			ip = strings.TrimSpace(forwarded[:commaIdx])
+		} else {
+			ip = strings.TrimSpace(forwarded)
 		}
 	}
 

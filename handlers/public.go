@@ -80,14 +80,10 @@ func TrackHandler(w http.ResponseWriter, r *http.Request) {
 	// Only trust the first IP to prevent IP spoofing
 	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
 		// Take only the first IP in the chain (client IP)
-		if idx := len(forwarded); idx > 0 {
-			for i, c := range forwarded {
-				if c == ',' || c == ' ' {
-					idx = i
-					break
-				}
-			}
-			ip = forwarded[:idx]
+		if commaIdx := strings.IndexAny(forwarded, ", "); commaIdx > 0 {
+			ip = strings.TrimSpace(forwarded[:commaIdx])
+		} else {
+			ip = strings.TrimSpace(forwarded)
 		}
 	}
 
