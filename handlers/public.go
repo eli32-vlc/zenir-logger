@@ -77,8 +77,14 @@ func TrackHandler(w http.ResponseWriter, r *http.Request) {
 
 	ip := r.RemoteAddr
 	// Handle X-Forwarded-For if behind a proxy
+	// Only trust the first IP to prevent IP spoofing
 	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-		ip = forwarded
+		// Take only the first IP in the chain (client IP)
+		if commaIdx := strings.IndexAny(forwarded, ", "); commaIdx > 0 {
+			ip = strings.TrimSpace(forwarded[:commaIdx])
+		} else {
+			ip = strings.TrimSpace(forwarded)
+		}
 	}
 
 	log.Printf("Tracking visit for LinkID: %d, IP: %s", req.LinkID, ip)

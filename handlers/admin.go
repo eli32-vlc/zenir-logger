@@ -1,9 +1,13 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"html/template"
-	"math/rand"
+	"log"
+	"math/big"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/easonli/zenir/db"
@@ -36,9 +40,17 @@ type Visit struct {
 type PageData struct {
 	Authenticated bool
 	Data          interface{}
+	CSRFToken     string
 }
 
 func AdminDashboardHandler(w http.ResponseWriter, r *http.Request) {
+	csrfToken, err := GetCSRFTokenForRequest(r, w)
+	if err != nil {
+		log.Printf("Failed to get CSRF token: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	
 	rows, err := db.DB.Query("SELECT id, slug, target, created_at FROM links ORDER BY created_at DESC")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -59,6 +71,7 @@ func AdminDashboardHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, PageData{
 		Authenticated: true,
 		Data:          links,
+		CSRFToken:     csrfToken,
 	})
 }
 
@@ -71,11 +84,33 @@ func CreateLinkHandler(w http.ResponseWriter, r *http.Request) {
 	target := r.FormValue("target")
 	slug := r.FormValue("slug")
 
-	if slug == "" {
+	// Validate target URL
+	parsedURL, err := url.Parse(target)
+	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
+		http.Error(w, "Invalid target URL. Must be a valid HTTP or HTTPS URL.", http.StatusBadRequest)
+		return
+	}
+
+	// Only allow http and https schemes to prevent javascript: or data: URIs
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		http.Error(w, "Invalid URL scheme. Only HTTP and HTTPS are allowed.", http.StatusBadRequest)
+		return
+	}
+
+	// Validate slug if provided
+	if slug != "" {
+		// Slug should only contain alphanumeric characters and hyphens
+		for _, c := range slug {
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
+				http.Error(w, "Invalid slug. Only alphanumeric characters, hyphens, and underscores are allowed.", http.StatusBadRequest)
+				return
+			}
+		}
+	} else {
 		slug = generateSlug(6)
 	}
 
-	_, err := db.DB.Exec("INSERT INTO links (slug, target) VALUES (?, ?)", slug, target)
+	_, err = db.DB.Exec("INSERT INTO links (slug, target) VALUES (?, ?)", slug, target)
 	if err != nil {
 		http.Error(w, "Slug already exists or database error", http.StatusInternalServerError)
 		return
@@ -85,9 +120,16 @@ func CreateLinkHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func LinkStatsHandler(w http.ResponseWriter, r *http.Request) {
+	csrfToken, err := GetCSRFTokenForRequest(r, w)
+	if err != nil {
+		log.Printf("Failed to get CSRF token: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	
 	slug := r.URL.Query().Get("slug")
 	var linkID int
-	err := db.DB.QueryRow("SELECT id FROM links WHERE slug = ?", slug).Scan(&linkID)
+	err = db.DB.QueryRow("SELECT id FROM links WHERE slug = ?", slug).Scan(&linkID)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -117,10 +159,18 @@ func LinkStatsHandler(w http.ResponseWriter, r *http.Request) {
 			"Slug":   slug,
 			"Visits": visits,
 		},
+		CSRFToken: csrfToken,
 	})
 }
 
 func HashStatsHandler(w http.ResponseWriter, r *http.Request) {
+	csrfToken, err := GetCSRFTokenForRequest(r, w)
+	if err != nil {
+		log.Printf("Failed to get CSRF token: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	
 	hash := r.URL.Query().Get("hash")
 	
 	rows, err := db.DB.Query("SELECT id, link_id, ip, user_agent, referer, screen_width, screen_height, device_pixel_ratio, language, platform, fingerprint, COALESCE(fingerprint_details, ''), COALESCE(timezone, ''), timestamp FROM visits WHERE fingerprint = ? ORDER BY timestamp DESC", hash)
@@ -146,6 +196,7 @@ func HashStatsHandler(w http.ResponseWriter, r *http.Request) {
 			"Hash":   hash,
 			"Visits": visits,
 		},
+		CSRFToken: csrfToken,
 	})
 }
 
@@ -197,7 +248,20 @@ const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 func generateSlug(length int) string {
 	b := make([]byte, length)
 	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			// Fallback to timestamp-based generation if crypto/rand fails
+			ts := strings.ReplaceAll(time.Now().Format("20060102150405.000000"), ".", "")
+			if len(ts) >= length {
+				return ts[:length]
+			}
+			// If timestamp is shorter, pad with random chars from charset
+			for len(ts) < length {
+				ts += string(charset[len(ts)%len(charset)])
+			}
+			return ts[:length]
+		}
+		b[i] = charset[n.Int64()]
 	}
 	return string(b)
 }

@@ -38,10 +38,13 @@ A powerful, self-hosted URL shortener and logger with advanced fingerprinting ca
     Create a `.env` file in the root directory:
     ```bash
     PORT=8080
-    SESSION_KEY=your-secret-session-key
+    SESSION_KEY=$(openssl rand -base64 32)  # Generate a secure random key
     ADMIN_USER=admin
-    ADMIN_PASS=password
+    ADMIN_PASS=your-strong-password-here
+    SECURE_COOKIES=true  # Enable in production with HTTPS
     ```
+    
+    **⚠️ Security Note**: Always use a strong, randomly generated `SESSION_KEY` and strong admin credentials in production.
 
 3.  **Build and Run**
     ```bash
@@ -80,3 +83,16 @@ A powerful, self-hosted URL shortener and logger with advanced fingerprinting ca
 ## License
 
 Copyright Zenith Rifle 2025.
+
+## Security
+
+For information about security vulnerabilities and fixes, see [SECURITY.md](SECURITY.md).
+
+**Key Security Features:**
+- ✅ CSRF protection on all forms
+- ✅ Rate limiting on login attempts (5 attempts per 15 minutes)
+- ✅ Secure session management with HttpOnly cookies
+- ✅ URL validation to prevent XSS via malicious URLs
+- ✅ Content Security Policy headers
+- ✅ IP spoofing prevention
+- ✅ Cryptographically secure random slug generation
