@@ -120,13 +120,78 @@ func recordLoginAttempt(ip string, success bool) {
 	attempt.lastAttempt = time.Now()
 }
 
+// Generate CSRF token
+func generateCSRFToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
+}
+
+// Get or create CSRF token for session
+func getCSRFToken(session *sessions.Session) (string, error) {
+	if token, ok := session.Values["csrf_token"].(string); ok && token != "" {
+		return token, nil
+	}
+	
+	token, err := generateCSRFToken()
+	if err != nil {
+		return "", err
+	}
+	
+	session.Values["csrf_token"] = token
+	return token, nil
+}
+
+// GetCSRFTokenForRequest - Helper to get CSRF token from request
+func GetCSRFTokenForRequest(r *http.Request, w http.ResponseWriter) (string, error) {
+	session, _ := store.Get(r, "session-name")
+	token, err := getCSRFToken(session)
+	if err != nil {
+		return "", err
+	}
+	session.Save(r, w)
+	return token, nil
+}
+
+// Validate CSRF token
+func validateCSRFToken(r *http.Request, session *sessions.Session) bool {
+	sessionToken, ok := session.Values["csrf_token"].(string)
+	if !ok || sessionToken == "" {
+		return false
+	}
+	
+	formToken := r.FormValue("csrf_token")
+	return formToken == sessionToken
+}
+
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "session-name")
+	
 	if r.Method == "GET" {
+		csrfToken, err := getCSRFToken(session)
+		if err != nil {
+			log.Printf("Failed to generate CSRF token: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		session.Save(r, w)
+		
 		tmpl := template.Must(template.ParseFiles("templates/layout.html", "templates/login.html"))
 		tmpl.Execute(w, PageData{
 			Authenticated: false,
-			Data:          nil,
+			Data: map[string]string{
+				"CSRFToken": csrfToken,
+			},
 		})
+		return
+	}
+
+	// Validate CSRF token for POST requests
+	if !validateCSRFToken(r, session) {
+		log.Printf("CSRF token validation failed")
+		http.Error(w, "Invalid CSRF token", http.StatusForbidden)
 		return
 	}
 
@@ -184,6 +249,16 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
 			return
 		}
+		
+		// Validate CSRF token for state-changing requests
+		if r.Method == "POST" || r.Method == "PUT" || r.Method == "DELETE" {
+			if !validateCSRFToken(r, session) {
+				log.Printf("CSRF token validation failed for %s %s", r.Method, r.URL.Path)
+				http.Error(w, "Invalid CSRF token", http.StatusForbidden)
+				return
+			}
+		}
+		
 		next(w, r)
 	}
 }

@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/rand"
 	"html/template"
+	"log"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -39,9 +40,17 @@ type Visit struct {
 type PageData struct {
 	Authenticated bool
 	Data          interface{}
+	CSRFToken     string
 }
 
 func AdminDashboardHandler(w http.ResponseWriter, r *http.Request) {
+	csrfToken, err := GetCSRFTokenForRequest(r, w)
+	if err != nil {
+		log.Printf("Failed to get CSRF token: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	
 	rows, err := db.DB.Query("SELECT id, slug, target, created_at FROM links ORDER BY created_at DESC")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -62,6 +71,7 @@ func AdminDashboardHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, PageData{
 		Authenticated: true,
 		Data:          links,
+		CSRFToken:     csrfToken,
 	})
 }
 
@@ -110,9 +120,16 @@ func CreateLinkHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func LinkStatsHandler(w http.ResponseWriter, r *http.Request) {
+	csrfToken, err := GetCSRFTokenForRequest(r, w)
+	if err != nil {
+		log.Printf("Failed to get CSRF token: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	
 	slug := r.URL.Query().Get("slug")
 	var linkID int
-	err := db.DB.QueryRow("SELECT id FROM links WHERE slug = ?", slug).Scan(&linkID)
+	err = db.DB.QueryRow("SELECT id FROM links WHERE slug = ?", slug).Scan(&linkID)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -142,10 +159,18 @@ func LinkStatsHandler(w http.ResponseWriter, r *http.Request) {
 			"Slug":   slug,
 			"Visits": visits,
 		},
+		CSRFToken: csrfToken,
 	})
 }
 
 func HashStatsHandler(w http.ResponseWriter, r *http.Request) {
+	csrfToken, err := GetCSRFTokenForRequest(r, w)
+	if err != nil {
+		log.Printf("Failed to get CSRF token: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	
 	hash := r.URL.Query().Get("hash")
 	
 	rows, err := db.DB.Query("SELECT id, link_id, ip, user_agent, referer, screen_width, screen_height, device_pixel_ratio, language, platform, fingerprint, COALESCE(fingerprint_details, ''), COALESCE(timezone, ''), timestamp FROM visits WHERE fingerprint = ? ORDER BY timestamp DESC", hash)
@@ -171,6 +196,7 @@ func HashStatsHandler(w http.ResponseWriter, r *http.Request) {
 			"Hash":   hash,
 			"Visits": visits,
 		},
+		CSRFToken: csrfToken,
 	})
 }
 
