@@ -46,7 +46,11 @@ var csrfStore = &CSRFStore{
 // Generate CSRF token
 func GenerateCSRFToken() string {
 	b := make([]byte, 32)
-	rand.Read(b)
+	_, err := rand.Read(b)
+	if err != nil {
+		// If crypto/rand fails, this is a critical error
+		panic("crypto/rand is unavailable: " + err.Error())
+	}
 	token := base64.URLEncoding.EncodeToString(b)
 	
 	csrfStore.mu.Lock()

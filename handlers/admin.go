@@ -225,17 +225,25 @@ func DeleteLinkHandler(w http.ResponseWriter, r *http.Request) {
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 func generateSlug(length int) string {
-	b := make([]byte, length)
 	// Use crypto/rand for secure random generation
-	_, err := rand.Read(b)
-	if err != nil {
-		// Fallback to timestamp-based generation if crypto/rand fails
-		return string(time.Now().UnixNano())
+	maxRetries := 3
+	for retry := 0; retry < maxRetries; retry++ {
+		b := make([]byte, length)
+		_, err := rand.Read(b)
+		if err == nil {
+			// Successfully generated random bytes
+			// Map each byte to a character in the charset
+			for i := range b {
+				b[i] = charset[int(b[i])%len(charset)]
+			}
+			return string(b)
+		}
+		// If crypto/rand failed, retry
+		time.Sleep(10 * time.Millisecond)
 	}
-	for i := range b {
-		b[i] = charset[int(b[i])%len(charset)]
-	}
-	return string(b)
+	// If all retries failed, this is a critical error
+	// We cannot generate secure slugs without crypto/rand
+	panic("crypto/rand is unavailable after retries")
 }
 
 // isValidURL checks if a URL is safe to redirect to
